@@ -7,10 +7,12 @@ export class SetupUseCase {
    * Crea un'istanza del caso d'uso del setup.
    * @param {import("../ports/shell-port.mjs").ShellPort} shellPort - La porta per eseguire comandi shell.
    * @param {import("../ports/file-system-port.mjs").FileSystemPort} fileSystemPort - La porta per l'accesso al file system.
+   * @param {import("../ports/state-port.mjs").StatePort} statePort - La porta per lo stato persistente.
    */
-  constructor(shellPort, fileSystemPort) {
+  constructor(shellPort, fileSystemPort, statePort) {
     this.shellPort = shellPort;
     this.fileSystemPort = fileSystemPort;
+    this.statePort = statePort;
   }
 
   /**
@@ -24,30 +26,34 @@ export class SetupUseCase {
    *   checks: {
    *     agyCli: { status: 'ok'|'error', message: string },
    *     configDir: { status: 'ok'|'error', message: string },
-   *     quota: { status: 'ok'|'error'|'warning', message: string }
+   *     quota: { status: 'ok'|'error'|'warning', message: string },
+   *     modelValidation: { status: 'ok'|'error', message: string }
    *   }
    * }>}
    */
   async execute() {
     // Eseguiamo tutti i controlli concorrentemente con Promise.all per evitare colli di bottiglia sequenziali.
-    const [agyCli, configDir, quota] = await Promise.all([
+    const [agyCli, configDir, quota, modelValidation] = await Promise.all([
       this._checkAgyCli(),
       this._checkConfigDir(),
-      this._checkQuota()
+      this._checkQuota(),
+      this._checkModelValidation()
     ]);
 
-    // Il plugin è pronto se i controlli principali sono 'ok' e la quota non ha generato errori bloccanti.
+    // Il plugin è pronto se i controlli principali e la validazione del modello sono 'ok' e la quota non ha generato errori bloccanti.
     // (Nota: lo stato di warning sulla quota consente comunque il funzionamento, quindi quota.status !== "error").
     const isReady = agyCli.status === "ok" &&
                     configDir.status === "ok" &&
-                    quota.status !== "error";
+                    quota.status !== "error" &&
+                    modelValidation.status === "ok";
 
     return {
       isReady,
       checks: {
         agyCli,
         configDir,
-        quota
+        quota,
+        modelValidation
       }
     };
   }
@@ -185,5 +191,121 @@ export class SetupUseCase {
         message: `Errore durante la verifica della quota: ${error.message}`
       };
     }
+  }
+
+  /**
+   * Esegue la validazione del modello selezionato nello stato contro i modelli disponibili nella CLI.
+   * @private
+   */
+  async _checkModelValidation() {
+    try {
+      if (!this.statePort) {
+        return {
+          status: "error",
+          message: "StatePort non configurato per la validazione del modello"
+        };
+      }
+
+      const config = await this.statePort.loadConfig();
+      const selectedModel = config ? config.selectedModel : null;
+
+      if (!selectedModel) {
+        return {
+          status: "error",
+          message: "Nessun modello precedentemente selezionato"
+        };
+      }
+
+      const availableModels = await this._getAvailableModels();
+      if (!availableModels.includes(selectedModel)) {
+        return {
+          status: "error",
+          message: `Il modello selezionato '${selectedModel}' non è disponibile in agy`
+        };
+      }
+
+      return {
+        status: "ok",
+        message: `Modello selezionato '${selectedModel}' valido`
+      };
+    } catch (error) {
+      return {
+        status: "error",
+        message: `Errore durante la validazione del modello: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * Recupera la lista di modelli disponibili da agy, con fallback a --help se 'agy model' fallisce.
+   * @private
+   */
+  async _getAvailableModels() {
+    let stdout = "";
+    try {
+      const result = await this.shellPort.execute("agy", ["model"]);
+      if (result.exitCode === 0) {
+        stdout = result.stdout;
+      } else {
+        const helpResult = await this.shellPort.execute("agy", ["--help"]);
+        if (helpResult.exitCode === 0) {
+          stdout = helpResult.stdout;
+        } else {
+          throw new Error("Errore durante l'esecuzione del comando agy model e del fallback agy --help.");
+        }
+      }
+    } catch (err) {
+      try {
+        const helpResult = await this.shellPort.execute("agy", ["--help"]);
+        if (helpResult.exitCode === 0) {
+          stdout = helpResult.stdout;
+        } else {
+          throw new Error(`Errore generato dal comando agy: ${err.message}`);
+        }
+      } catch (innerErr) {
+        throw new Error(`Errore durante il recupero dei modelli: ${err.message}`);
+      }
+    }
+
+    return this._parseModels(stdout);
+  }
+
+  /**
+   * Analizza l'output del comando o del fallback per estrarre la lista di modelli.
+   * @private
+   */
+  _parseModels(stdout) {
+    const models = [];
+    const lines = stdout.split(/\r?\n/);
+    let hasBullets = false;
+
+    for (let line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("-") || trimmed.startsWith("*")) {
+        const m = trimmed.substring(1).trim();
+        if (m) {
+          models.push(m);
+          hasBullets = true;
+        }
+      }
+    }
+
+    if (!hasBullets) {
+      const match = stdout.match(/(?:Modelli supportati:|Supported models:)\s*([^\n]+)/i);
+      if (match) {
+        const listStr = match[1];
+        const parts = listStr.split(/[,\s]+/).map(p => p.trim()).filter(Boolean);
+        models.push(...parts);
+      } else {
+        for (let line of lines) {
+          const trimmed = line.trim();
+          if (trimmed) {
+            models.push(trimmed);
+          }
+        }
+      }
+    }
+
+    return models;
   }
 }

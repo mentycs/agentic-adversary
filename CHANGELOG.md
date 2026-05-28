@@ -6,6 +6,11 @@
 
 ## Releases
 
+### [0.3.2] — 2026-05-28
+- Implementato `ModelUseCase` in `src/core/model-use-case.mjs` per gestire la selezione del modello in modo diretto e interattivo.
+- Aggiornato `SetupUseCase` in `src/core/setup-use-case.mjs` per includere la validazione del modello precedentemente selezionato e il fallback a `--help` se `agy model` fallisce.
+- Passati con successo tutti i 15 test TDD nativi in `tests/model-use-case.test.mjs` e `tests/setup-use-case.test.mjs`.
+
 ### [0.3.1] — 2026-05-28
 - Eseguita la validazione e la verifica finale del plugin `plugins/agy/` (GREEN LIGHT).
 - Aggiornato il report di validazione avversaria (`report-2026-05-28-adversary-validation-agy.md`) per documentare il superamento di tutti i controlli.
@@ -49,6 +54,11 @@
 - Inizializzazione della struttura del repository e avvio dell'analisi comparativa tra OpenAI Codex Plugin CC e Antigravity SDK (`agy`).
 
 ## Action log
+
+- **2026-05-28 09:40**: Implementati ed eseguiti con successo i test TDD per il comando `/agy:model` e l'integrazione della validazione del modello in `/agy:setup`.
+  - **Rationale**: Soddisfare i requisiti del Room Adversary per l'architettura esagonale disaccoppiando la business logic tramite StatePort e InteractionPort e integrando controlli robusti nel setup.
+  - **User request**: Review the hexagonal architecture design and TDD test suite proposed for the new `/agy:model` command and the updated `/agy:setup` model validation checks.
+  - **Rollback**: Ripristinare `src/core/model-use-case.mjs`, `src/core/setup-use-case.mjs` e `VERSION` alle versioni precedenti.
 
 - **2026-05-28 08:35**: Eseguita validazione finale del plugin Antigravity (`plugins/agy/`) con esito positivo (GREEN LIGHT).
   - **Rationale**: Confermare la completa eliminazione di qualsiasi riferimento a Codex, la corretta ridenominazione dei subagent/skill e il superamento dei test del plugin.
