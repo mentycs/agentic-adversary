@@ -6,6 +6,12 @@
 
 ## Releases
 
+### [0.4.1] — 2026-05-28
+- Aggiunto lo script di bootstrap autocontenuto `install.mjs` per consentire l'installazione remota diretta del plugin da GitHub.
+- Implementato il download automatico con gestione errori (flag `-f` su curl) e l'estrazione dello zipball nella cartella utente permanente `~/.antigravitycli/installed/`.
+- Implementata la pre-configurazione del token PAT e del repository per il workspace corrente all'interno del file di stato locale del plugin.
+- Aggiornato il `README.md` con i comandi rapidi di installazione diretta da terminale.
+
 ### [0.4.0] — 2026-05-28
 - Aggiunto il caso d'uso `MarketplaceUseCase` per abilitare l'installazione tramite GitHub Marketplace con PAT.
 - Implementato il comando `/agy:marketplace-add` nel companion script e nei comandi del plugin.
@@ -75,6 +81,11 @@
 - Inizializzazione della struttura del repository e avvio dell'analisi comparativa tra OpenAI Codex Plugin CC e Antigravity SDK (`agy`).
 
 ## Action log
+
+- **2026-05-28 11:50**: Aggiunto lo script autocontenuto `install.mjs` ed aggiornato `README.md` per consentire l'installazione remota diretta del plugin da GitHub senza clonazione manuale.
+  - **Rationale**: Consentire agli utenti di installare ed abilitare il plugin inserendo direttamente le credenziali di GitHub da terminale, evitando la necessità di scaricare o clonare manualmente il repository locale prima dell'uso.
+  - **User request**: in questo modo devo sempre clonare in locale il repo, non posso farlo puntando solo github?
+  - **Rollback**: Rimuovere `install.mjs`, ripristinare `README.md`, `VERSION` e `package.json` a `0.4.0`.
 
 - **2026-05-28 11:30**: Implementato il caso d'uso `MarketplaceUseCase`, integrato in `agy-companion.mjs` sotto il comando `marketplace-add`, aggiornato `SetupUseCase` con la relativa diagnostica e documentati gli scope del PAT richiesti nel README e nel codice.
   - **Rationale**: Permettere l'installazione sicura da GitHub Marketplace per repository privati usando credenziali certificate e validate via API di GitHub con curl.

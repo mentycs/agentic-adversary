@@ -12,6 +12,42 @@ Questo plugin consente di integrare e utilizzare le funzionalità di Google Anti
 - **/agy:rescue**: Delega un task specifico ad Antigravity in background o foreground.
 
 ---
+## Installazione Diretta da GitHub (Senza Clonazione Manuale)
+
+Se non desideri clonare manualmente il repository sul tuo computer, puoi utilizzare lo script di installazione automatica `install.mjs`.
+
+### 1. Esecuzione per Repository Pubblici
+
+Se il repository del plugin è pubblico, puoi avviarne l'installazione eseguendo direttamente questo comando nel tuo terminale:
+
+```bash
+node -e "$(curl -fsSL https://raw.githubusercontent.com/powered/projects/codex-aversary/main/install.mjs)" -- --repo powered/projects/codex-aversary
+```
+
+### 2. Esecuzione per Repository Privati (o con Autenticazione PAT immediata)
+
+Se il repository è privato, o se desideri passare direttamente il tuo Personal Access Token (PAT) per pre-configurare il Marketplace:
+
+```bash
+# Scarica lo script di installazione
+curl -fsSL https://raw.githubusercontent.com/powered/projects/codex-aversary/main/install.mjs -o install.mjs
+
+# Esegui lo script (ti chiederà il PAT in modo interattivo e mascherato se non passato via parametro)
+node install.mjs --repo powered/projects/codex-aversary
+```
+
+Al termine del download, lo script:
+- Creerà la directory permanente `~/.antigravitycli/installed/powered-projects-codex-aversary`.
+- Estrarrà tutti i file sorgente necessari.
+- Configurerà automaticamente il PAT e il repository nello stato locale del workspace.
+
+A quel punto, ti basterà avviare Claude Code nel tuo workspace ed eseguire il comando:
+
+```
+/plugin add ~/.antigravitycli/installed/powered-projects-codex-aversary/plugins/agy
+```
+
+---
 
 ## Configurazione e Installazione via GitHub Marketplace
 
