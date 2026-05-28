@@ -185,6 +185,7 @@ export function renderSetupReport(report) {
     `- modello: ${report.modelValidation ? report.modelValidation.message : "non configurato"}`,
     `- session runtime: ${report.sessionRuntime.label}`,
     `- review gate: ${report.reviewGateEnabled ? "abilitato" : "disabilitato"}`,
+    `- github pat: ${report.githubPat ? report.githubPat.message : "non configurato"}`,
     ""
   ];
 

@@ -27,25 +27,28 @@ export class SetupUseCase {
    *     agyCli: { status: 'ok'|'error', message: string },
    *     configDir: { status: 'ok'|'error', message: string },
    *     quota: { status: 'ok'|'error'|'warning', message: string },
-   *     modelValidation: { status: 'ok'|'error', message: string }
+   *     modelValidation: { status: 'ok'|'error', message: string },
+   *     githubPat: { status: 'ok'|'error', message: string }
    *   }
    * }>}
    */
   async execute() {
     // Eseguiamo tutti i controlli concorrentemente con Promise.all per evitare colli di bottiglia sequenziali.
-    const [agyCli, configDir, quota, modelValidation] = await Promise.all([
+    const [agyCli, configDir, quota, modelValidation, githubPat] = await Promise.all([
       this._checkAgyCli(),
       this._checkConfigDir(),
       this._checkQuota(),
-      this._checkModelValidation()
+      this._checkModelValidation(),
+      this._checkGithubPat()
     ]);
 
-    // Il plugin è pronto se i controlli principali e la validazione del modello sono 'ok' e la quota non ha generato errori bloccanti.
-    // (Nota: lo stato di warning sulla quota consente comunque il funzionamento, quindi quota.status !== "error").
+    // Il plugin è pronto se i controlli principali, la validazione del modello e il PAT di GitHub (se configurato) sono 'ok'
+    // e la quota non ha generato errori bloccanti.
     const isReady = agyCli.status === "ok" &&
                     configDir.status === "ok" &&
                     quota.status !== "error" &&
-                    modelValidation.status === "ok";
+                    modelValidation.status === "ok" &&
+                    githubPat.status !== "error";
 
     return {
       isReady,
@@ -53,7 +56,8 @@ export class SetupUseCase {
         agyCli,
         configDir,
         quota,
-        modelValidation
+        modelValidation,
+        githubPat
       }
     };
   }
@@ -325,5 +329,87 @@ export class SetupUseCase {
     }
 
     return models;
+  }
+
+  /**
+   * Verifica lo stato del PAT di GitHub e del repository associato se configurati.
+   * @private
+   */
+  async _checkGithubPat() {
+    try {
+      if (!this.statePort) {
+        return {
+          status: "ok",
+          message: "StatePort non configurato, impossibile verificare il PAT GitHub"
+        };
+      }
+
+      const config = await this.statePort.loadConfig();
+      const pat = config ? config.githubPat : null;
+      const repo = config ? config.githubRepo : null;
+
+      if (!pat || !repo) {
+        return {
+          status: "ok",
+          message: "PAT GitHub non configurato (opzionale per installazioni dal Marketplace)"
+        };
+      }
+
+      const result = await this.shellPort.execute("curl", [
+        "-s",
+        "-i",
+        "-H", `Authorization: token ${pat}`,
+        "-H", "User-Agent: agy-companion",
+        `https://api.github.com/repos/${repo}`
+      ]);
+
+      if (result.exitCode !== 0) {
+        return {
+          status: "error",
+          message: `Verifica PAT fallita. Connessione a GitHub fallita (exit code: ${result.exitCode}). Errore: ${result.stderr.trim()}`
+        };
+      }
+
+      const stdout = result.stdout;
+      const httpStatusMatch = stdout.match(/HTTP\/\d+(?:\.\d+)?\s+(\d+)/);
+      if (!httpStatusMatch) {
+        return {
+          status: "error",
+          message: "Verifica PAT fallita. Risposta da GitHub non valida."
+        };
+      }
+
+      const statusCode = parseInt(httpStatusMatch[1], 10);
+      if (statusCode === 200) {
+        return {
+          status: "ok",
+          message: `PAT GitHub valido e connessione al repository '${repo}' riuscita`
+        };
+      }
+
+      if (statusCode === 401) {
+        return {
+          status: "error",
+          message: "PAT di GitHub non valido o scaduto (401 Unauthorized)"
+        };
+      }
+
+      if (statusCode === 404) {
+        return {
+          status: "error",
+          message: `Repository '${repo}' non trovato o PAT privo di permessi di accesso (404 Not Found)`
+        };
+      }
+
+      return {
+        status: "error",
+        message: `Risposta inattesa da GitHub con codice HTTP ${statusCode}`
+      };
+    } catch (error) {
+      return {
+        status: "error",
+        message: `Errore durante la verifica del PAT GitHub: ${error.message}`
+      };
+    }
   }
 }

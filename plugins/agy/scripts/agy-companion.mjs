@@ -40,6 +40,7 @@ import {
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
 import { SetupUseCase } from "../../../src/core/setup-use-case.mjs";
 import { ModelUseCase } from "../../../src/core/model-use-case.mjs";
+import { MarketplaceUseCase } from "../../../src/core/marketplace-use-case.mjs";
 import {
   NodeShellAdapter,
   NodeFileSystemAdapter,
@@ -66,6 +67,7 @@ function printUsage() {
       "Uso:",
       "  node scripts/agy-companion.mjs setup [--enable-review-gate|--disable-review-gate] [--json]",
       "  node scripts/agy-companion.mjs model [modello] [--json]",
+      "  node scripts/agy-companion.mjs marketplace-add [pat] [repo] [--pat pat] [--repo repo] [--json]",
       "  node scripts/agy-companion.mjs review [--wait|--background]",
       "  node scripts/agy-companion.mjs adversarial-review [--wait|--background] [focus text]",
       "  node scripts/agy-companion.mjs task [--background] [--resume-last|--resume|--fresh] [prompt]",
@@ -202,6 +204,9 @@ async function buildSetupReportLocal(cwd, actionsTaken = []) {
   if (useCaseResult.checks.modelValidation.status !== "ok") {
     nextSteps.push("Seleziona un modello con il comando `/agy:model`.");
   }
+  if (useCaseResult.checks.githubPat && useCaseResult.checks.githubPat.status === "error") {
+    nextSteps.push("Configura o aggiorna il Personal Access Token di GitHub usando `/agy:marketplace-add`.");
+  }
   if (!config.stopReviewGate) {
     nextSteps.push("Opzionale: esegui `/agy:setup --enable-review-gate` per abilitare la code review prima della chiusura.");
   }
@@ -221,6 +226,7 @@ async function buildSetupReportLocal(cwd, actionsTaken = []) {
       ...(quotaCheck.errorType ? { errorType: quotaCheck.errorType } : {})
     },
     modelValidation: useCaseResult.checks.modelValidation,
+    githubPat: useCaseResult.checks.githubPat,
     sessionRuntime: getSessionRuntimeStatus(process.env, workspaceRoot),
     reviewGateEnabled: Boolean(config.stopReviewGate),
     actionsTaken,
@@ -802,6 +808,52 @@ async function handleModel(argv) {
   }
 }
 
+async function handleMarketplaceAdd(argv) {
+  const { options, positionals } = parseCommandInput(argv, {
+    valueOptions: ["cwd", "pat", "repo"],
+    booleanOptions: ["json"]
+  });
+
+  const cwd = resolveCommandCwd(options);
+  const workspaceRoot = resolveCommandWorkspace(options);
+  const targetPat = options.pat ?? positionals[0] ?? null;
+  const targetRepo = options.repo ?? positionals[1] ?? null;
+
+  const shellAdapter = new NodeShellAdapter(cwd);
+  const stateAdapter = new NodeStateAdapter(workspaceRoot);
+  const interactionAdapter = new NodeInteractionAdapter();
+
+  const marketplaceUseCase = new MarketplaceUseCase(shellAdapter, stateAdapter, interactionAdapter);
+
+  try {
+    const result = await marketplaceUseCase.execute(targetPat, targetRepo);
+    const output = {
+      success: true,
+      repo: result.repo,
+      message: result.message
+    };
+
+    if (options.json) {
+      console.log(JSON.stringify(output, null, 2));
+    } else {
+      console.log(`\nSuccesso: ${result.message}`);
+      console.log(`Repository configurato: ${result.repo}`);
+    }
+  } catch (error) {
+    const output = {
+      success: false,
+      error: error.message
+    };
+    if (options.json) {
+      console.log(JSON.stringify(output, null, 2));
+    } else {
+      console.error(`\nErrore: ${error.message}`);
+    }
+    process.exitCode = 1;
+  }
+}
+
+
 async function main() {
   const [subcommand, ...argv] = process.argv.slice(2);
   if (!subcommand || subcommand === "help" || subcommand === "--help") {
@@ -815,6 +867,9 @@ async function main() {
       break;
     case "model":
       await handleModel(argv);
+      break;
+    case "marketplace-add":
+      await handleMarketplaceAdd(argv);
       break;
     case "review":
       await handleReviewCommand(argv, false);

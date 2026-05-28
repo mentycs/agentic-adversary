@@ -6,6 +6,14 @@
 
 ## Releases
 
+### [0.4.0] — 2026-05-28
+- Aggiunto il caso d'uso `MarketplaceUseCase` per abilitare l'installazione tramite GitHub Marketplace con PAT.
+- Implementato il comando `/agy:marketplace-add` nel companion script e nei comandi del plugin.
+- Esteso `SetupUseCase` per validare le credenziali GitHub e riportare lo stato diagnostico.
+- Implementata l'acquisizione interattiva del PAT e del repository di GitHub con mascheramento dell'input del PAT sul terminale.
+- Scritta la suite di test unitari in `tests/marketplace-use-case.test.mjs` e aggiornata la suite di test integrati in `tests/agy-companion.test.mjs` e `tests/setup-use-case.test.mjs`.
+- Documentati i requisiti del PAT GitHub nel `README.md` e nel codice.
+
 ### [0.3.4] — 2026-05-28
 - Spostata la configurazione del modello di default direttamente all'interno delle impostazioni predefinite dello stato (`defaultState()` in `state.mjs`).
 - Reso `gemini-3.5-flash` il modello di default forzatamente pre-impostato per tutte le nuove sessioni, a meno che non venga modificato manualmente con `/agy:model`.
@@ -67,6 +75,11 @@
 - Inizializzazione della struttura del repository e avvio dell'analisi comparativa tra OpenAI Codex Plugin CC e Antigravity SDK (`agy`).
 
 ## Action log
+
+- **2026-05-28 11:30**: Implementato il caso d'uso `MarketplaceUseCase`, integrato in `agy-companion.mjs` sotto il comando `marketplace-add`, aggiornato `SetupUseCase` con la relativa diagnostica e documentati gli scope del PAT richiesti nel README e nel codice.
+  - **Rationale**: Permettere l'installazione sicura da GitHub Marketplace per repository privati usando credenziali certificate e validate via API di GitHub con curl.
+  - **User request**: Implementa la feature 'install via marketplace github con abilitazione via PAT' in architettura esagonale...
+  - **Rollback**: Ripristinare `plugins/agy/scripts/agy-companion.mjs`, `plugins/agy/scripts/lib/render.mjs`, `plugins/agy/scripts/lib/adapters.mjs`, `src/ports/interaction-port.mjs`, `src/core/setup-use-case.mjs`, rimuovere `src/core/marketplace-use-case.mjs`, `tests/marketplace-use-case.test.mjs`, `plugins/agy/commands/marketplace-add.md`, e ripristinare `VERSION` e `package.json` a `0.3.4`.
 
 - **2026-05-28 10:55**: Spostato il modello predefinito globale all'interno di `defaultState()` di `state.mjs`. In questo modo `gemini-3.5-flash` viene configurato automaticamente all'avvio come modello predefinito, a meno che non venga modificato manualmente.
   - **Rationale**: Assicurare che tutti i comandi legati ad agy utilizzino fin da subito gemini-3.5-flash senza forzature a runtime durante il setup.

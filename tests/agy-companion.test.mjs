@@ -64,6 +64,32 @@ process.exit(1);
 
   const mockAgyPath = path.join(MOCK_BIN_DIR, "agy");
   fs.writeFileSync(mockAgyPath, mockAgySource, { mode: 0o755 });
+
+  // Creiamo lo script mock per curl per intercettare le chiamate alle API GitHub
+  const mockCurlSource = `#!/usr/bin/env node
+import process from "node:process";
+const args = process.argv.slice(2);
+
+const urlArg = args.find(a => a.startsWith('https://api.github.com/'));
+if (urlArg) {
+  if (urlArg.includes('owner/repo-inesistente')) {
+    process.stdout.write('HTTP/2 404\\n\\n');
+    process.exit(0);
+  }
+  if (args.some(a => a.includes('ghp_invalid'))) {
+    process.stdout.write('HTTP/2 401\\n\\n');
+    process.exit(0);
+  }
+  process.stdout.write('HTTP/2 200\\nContent-Type: application/json\\n\\n{"name": "repo-valido"}\\n');
+  process.exit(0);
+}
+
+process.stderr.write('Comando curl mock sconosciuto: ' + args.join(' ') + '\\n');
+process.exit(1);
+`;
+
+  const mockCurlPath = path.join(MOCK_BIN_DIR, "curl");
+  fs.writeFileSync(mockCurlPath, mockCurlSource, { mode: 0o755 });
 });
 
 test.after(() => {
@@ -281,3 +307,38 @@ test("agy-companion model - impostazione modello non supportata", () => {
   assert.equal(result.success, false);
   assert.match(result.error, /non supportato/);
 });
+
+test("agy-companion marketplace-add - successo", () => {
+  const env = {
+    ...process.env,
+    PATH: `${MOCK_BIN_DIR}:${process.env.PATH}`
+  };
+
+  const res = spawnSync(process.execPath, [COMPANION_PATH, "marketplace-add", "ghp_valid", "owner/repo", "--json"], {
+    env,
+    encoding: "utf8"
+  });
+
+  assert.equal(res.status, 0, `Exit code errato: ${res.status}. Stderr: ${res.stderr}`);
+  const result = JSON.parse(res.stdout);
+  assert.equal(result.success, true);
+  assert.equal(result.repo, "owner/repo");
+});
+
+test("agy-companion marketplace-add - fallimento validazione", () => {
+  const env = {
+    ...process.env,
+    PATH: `${MOCK_BIN_DIR}:${process.env.PATH}`
+  };
+
+  const res = spawnSync(process.execPath, [COMPANION_PATH, "marketplace-add", "ghp_invalid", "owner/repo", "--json"], {
+    env,
+    encoding: "utf8"
+  });
+
+  assert.equal(res.status, 1);
+  const result = JSON.parse(res.stdout);
+  assert.equal(result.success, false);
+  assert.match(result.error, /401 Unauthorized/);
+});
+

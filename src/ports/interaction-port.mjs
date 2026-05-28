@@ -12,4 +12,15 @@ export class InteractionPort {
   async selectOption(question, choices) {
     throw new Error("Metodo 'selectOption' non implementato nella classe base InteractionPort");
   }
+
+  /**
+   * Chiede all'utente un input testuale diretto.
+   * @param {string} question - La domanda da mostrare all'utente.
+   * @param {boolean} [hidden] - Se true, maschera l'input durante la digitazione (es. per password/token).
+   * @returns {Promise<string>} L'input dell'utente.
+   */
+  async askQuestion(question, hidden = false) {
+    throw new Error("Metodo 'askQuestion' non implementato nella classe base InteractionPort");
+  }
 }
+

@@ -120,4 +120,35 @@ export class NodeInteractionAdapter extends InteractionPort {
       ask();
     });
   }
+
+  async askQuestion(question, hidden = false) {
+    return new Promise((resolve) => {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+
+      const promptStr = `${question} `;
+
+      if (hidden) {
+        rl._writeToOutput = function _writeToOutput(stringToWrite) {
+          if (stringToWrite === "\r\n" || stringToWrite === "\n" || stringToWrite === "\r") {
+            rl.output.write(stringToWrite);
+            return;
+          }
+          if (rl.line.length > 0) {
+            rl.output.write("\r\x1B[K" + promptStr + "*".repeat(rl.line.length));
+          } else {
+            rl.output.write("\r\x1B[K" + promptStr);
+          }
+        };
+      }
+
+      rl.question(promptStr, (answer) => {
+        rl.close();
+        resolve(answer.trim());
+      });
+    });
+  }
 }
+

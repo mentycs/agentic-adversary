@@ -327,3 +327,69 @@ test("SetupUseCase - Successo della validazione usando il fallback 'agy --help' 
   assert.equal(result.isReady, true, "Il setup dovrebbe essere pronto e valido usando il fallback --help");
   assert.equal(result.checks.modelValidation.status, "ok");
 });
+
+test("SetupUseCase - Validazione del PAT GitHub con successo se configurato e valido", async () => {
+  const shellMock = new MockShellPort(async (command, args) => {
+    if (command === "agy" && args.includes("--version")) {
+      return { exitCode: 0, stdout: "agy versione 1.0.0\n", stderr: "" };
+    }
+    if (command === "agy" && args.join(" ").includes("quota")) {
+      return { exitCode: 0, stdout: '{"total": 100, "remaining": 90}\n', stderr: "" };
+    }
+    if (command === "agy" && args.includes("model")) {
+      return { exitCode: 0, stdout: "gemini-1.5-pro\n", stderr: "" };
+    }
+    if (command === "curl") {
+      assert.ok(args.includes("Authorization: token ghp_valid"));
+      return { exitCode: 0, stdout: "HTTP/2 200\n\n", stderr: "" };
+    }
+    return { exitCode: 1, stdout: "", stderr: "Comando non mockato" };
+  });
+
+  const fsMock = new MockFileSystemPort(async () => true);
+  const stateMock = new MockStatePort({
+    selectedModel: "gemini-1.5-pro",
+    githubPat: "ghp_valid",
+    githubRepo: "owner/repo"
+  });
+
+  const useCase = new SetupUseCase(shellMock, fsMock, stateMock);
+  const result = await useCase.execute();
+
+  assert.equal(result.isReady, true, "Il setup dovrebbe essere pronto con PAT valido");
+  assert.equal(result.checks.githubPat.status, "ok");
+  assert.match(result.checks.githubPat.message, /valido/i);
+});
+
+test("SetupUseCase - Fallimento del setup se il PAT GitHub è configurato ma non valido (401)", async () => {
+  const shellMock = new MockShellPort(async (command, args) => {
+    if (command === "agy" && args.includes("--version")) {
+      return { exitCode: 0, stdout: "agy versione 1.0.0\n", stderr: "" };
+    }
+    if (command === "agy" && args.join(" ").includes("quota")) {
+      return { exitCode: 0, stdout: '{"total": 100, "remaining": 90}\n', stderr: "" };
+    }
+    if (command === "agy" && args.includes("model")) {
+      return { exitCode: 0, stdout: "gemini-1.5-pro\n", stderr: "" };
+    }
+    if (command === "curl") {
+      return { exitCode: 0, stdout: "HTTP/2 401\n\n", stderr: "" };
+    }
+    return { exitCode: 1, stdout: "", stderr: "Comando non mockato" };
+  });
+
+  const fsMock = new MockFileSystemPort(async () => true);
+  const stateMock = new MockStatePort({
+    selectedModel: "gemini-1.5-pro",
+    githubPat: "ghp_invalid",
+    githubRepo: "owner/repo"
+  });
+
+  const useCase = new SetupUseCase(shellMock, fsMock, stateMock);
+  const result = await useCase.execute();
+
+  assert.equal(result.isReady, false, "Il setup non dovrebbe essere pronto con PAT non valido");
+  assert.equal(result.checks.githubPat.status, "error");
+  assert.match(result.checks.githubPat.message, /non valido o scaduto/i);
+});
+
