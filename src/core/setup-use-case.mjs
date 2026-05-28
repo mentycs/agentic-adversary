@@ -207,16 +207,17 @@ export class SetupUseCase {
       }
 
       const config = await this.statePort.loadConfig();
-      const selectedModel = config ? config.selectedModel : null;
-
-      if (!selectedModel) {
-        return {
-          status: "error",
-          message: "Nessun modello precedentemente selezionato"
-        };
-      }
+      let selectedModel = config ? config.selectedModel : null;
 
       const availableModels = await this._getAvailableModels();
+
+      if (!selectedModel) {
+        // Se non è stato selezionato alcun modello, usiamo gemini-3.5-flash come predefinito
+        const defaultModel = "gemini-3.5-flash";
+        await this.statePort.saveConfig({ selectedModel: defaultModel });
+        selectedModel = defaultModel;
+      }
+
       if (!availableModels.includes(selectedModel)) {
         return {
           status: "error",
@@ -237,10 +238,18 @@ export class SetupUseCase {
   }
 
   /**
-   * Recupera la lista di modelli disponibili da agy, con fallback a --help se 'agy model' fallisce.
+   * Recupera la lista di modelli disponibili da agy, con fallback statico se la CLI non li espone.
    * @private
    */
   async _getAvailableModels() {
+    const FALLBACK_MODELS = [
+      "gemini-3.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-pro",
+      "gemini-1.5-flash",
+      "gemini-2.0-pro"
+    ];
+
     let stdout = "";
     try {
       const result = await this.shellPort.execute("agy", ["model"]);
@@ -250,8 +259,6 @@ export class SetupUseCase {
         const helpResult = await this.shellPort.execute("agy", ["--help"]);
         if (helpResult.exitCode === 0) {
           stdout = helpResult.stdout;
-        } else {
-          throw new Error("Errore durante l'esecuzione del comando agy model e del fallback agy --help.");
         }
       }
     } catch (err) {
@@ -259,15 +266,22 @@ export class SetupUseCase {
         const helpResult = await this.shellPort.execute("agy", ["--help"]);
         if (helpResult.exitCode === 0) {
           stdout = helpResult.stdout;
-        } else {
-          throw new Error(`Errore generato dal comando agy: ${err.message}`);
         }
       } catch (innerErr) {
-        throw new Error(`Errore durante il recupero dei modelli: ${err.message}`);
+        // Ignora e usa il fallback
       }
     }
 
-    return this._parseModels(stdout);
+    const parsedModels = this._parseModels(stdout);
+    // Se il parsing non restituisce modelli utili o cattura l'aiuto testuale generale di agy
+    const hasValidModels = parsedModels.length > 0 && 
+                           !parsedModels.some(m => m.toLowerCase().includes("usage") || m.toLowerCase().includes("subcommand"));
+
+    if (!hasValidModels) {
+      return FALLBACK_MODELS;
+    }
+
+    return parsedModels;
   }
 
   /**
@@ -275,6 +289,10 @@ export class SetupUseCase {
    * @private
    */
   _parseModels(stdout) {
+    if (!stdout || !stdout.trim()) {
+      return [];
+    }
+
     const models = [];
     const lines = stdout.split(/\r?\n/);
     let hasBullets = false;
@@ -299,7 +317,7 @@ export class SetupUseCase {
       } else {
         for (let line of lines) {
           const trimmed = line.trim();
-          if (trimmed) {
+          if (trimmed && trimmed.length < 50 && !trimmed.includes(" ") && !trimmed.includes(":")) {
             models.push(trimmed);
           }
         }

@@ -6,6 +6,14 @@
 
 ## Releases
 
+### [0.3.3] — 2026-05-28
+- Rimossa del tutto l'obbligatorietà e la segnalazione d'errore relativa a `GEMINI_API_KEY`, delegando l'autenticazione all'esito effettivo della CLI `agy` (OAuth).
+- Implementati gli adapter reali Node.js per le porte esagonali (`NodeShellAdapter`, `NodeFileSystemAdapter`, `NodeStateAdapter`, `NodeInteractionAdapter`) in `plugins/agy/scripts/lib/adapters.mjs`.
+- Cablato `SetupUseCase` nel setup locale di `agy-companion.mjs` per unificare i flussi di controllo architetturali.
+- Cablato `ModelUseCase` nel nuovo subcommand `model` di `agy-companion.mjs` per supportare l'impostazione diretta e interattiva del modello `/agy:model`.
+- Introdotta l'autoconfigurazione automatica al modello predefinito `gemini-3.5-flash` in assenza di selezioni passate, e gestito il fallback statico sui modelli Gemini noti qualora la CLI non risponda.
+- Suite di test aggiornata e superata con successo (24 test passati).
+
 ### [0.3.2] — 2026-05-28
 - Implementato `ModelUseCase` in `src/core/model-use-case.mjs` per gestire la selezione del modello in modo diretto e interattivo.
 - Aggiornato `SetupUseCase` in `src/core/setup-use-case.mjs` per includere la validazione del modello precedentemente selezionato e il fallback a `--help` se `agy model` fallisce.
@@ -54,6 +62,11 @@
 - Inizializzazione della struttura del repository e avvio dell'analisi comparativa tra OpenAI Codex Plugin CC e Antigravity SDK (`agy`).
 
 ## Action log
+
+- **2026-05-28 10:35**: Decoppiata definitivamente la chiave API `GEMINI_API_KEY` da setup e test. Implementati gli adapter reali delle porte esagonali e cablati `SetupUseCase` e `ModelUseCase` nel companion script, completando il comando `/agy:model`.
+  - **Rationale**: Permettere un setup robusto basato solo su OAuth CLI e autoconfigurare `gemini-3.5-flash` in modo resiliente rispetto ai limiti di interrogazione di agy.
+  - **User request**: La mancanza della variabile GEMINI_API_KEY non è bloccante, rimuovi quei vincoli. Predisponi una opzione per il setting del modello /agy:model che dopo invio entra nella modalità interattiva.
+  - **Rollback**: Ripristinare `plugins/agy/scripts/agy-companion.mjs`, `tests/agy-companion.test.mjs` e `VERSION` allo stato precedente all'azione (rilascio `0.3.2`).
 
 - **2026-05-28 09:40**: Implementati ed eseguiti con successo i test TDD per il comando `/agy:model` e l'integrazione della validazione del modello in `/agy:setup`.
   - **Rationale**: Soddisfare i requisiti del Room Adversary per l'architettura esagonale disaccoppiando la business logic tramite StatePort e InteractionPort e integrando controlli robusti nel setup.

@@ -182,6 +182,7 @@ export function renderSetupReport(report) {
     `- npm: ${report.npm.detail}`,
     `- agy: ${report.agy.detail}`,
     `- auth: ${report.auth.detail}`,
+    `- modello: ${report.modelValidation ? report.modelValidation.message : "non configurato"}`,
     `- session runtime: ${report.sessionRuntime.label}`,
     `- review gate: ${report.reviewGateEnabled ? "abilitato" : "disabilitato"}`,
     ""

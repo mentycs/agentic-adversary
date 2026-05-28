@@ -29,7 +29,20 @@ if (args.includes('--version')) {
 }
 
 if (args.includes('quota') && args.includes('--json')) {
+  if (process.env.MOCK_AGY_QUOTA_ERROR === 'login_failure') {
+    process.stderr.write('Unauthorized: Session expired\\n');
+    process.exit(401);
+  }
+  if (process.env.MOCK_AGY_QUOTA_ERROR === 'limits_reached') {
+    process.stderr.write('Rate limit exceeded\\n');
+    process.exit(429);
+  }
   process.stdout.write(JSON.stringify({ total: 100, remaining: 75 }) + '\\n');
+  process.exit(0);
+}
+
+if (args.includes('model')) {
+  process.stdout.write('gemini-1.5-pro\\ngemini-1.5-flash\\ngemini-2.0-flash\\n');
   process.exit(0);
 }
 
@@ -60,9 +73,15 @@ test.after(() => {
 test("agy-companion setup - output JSON corretto", () => {
   const env = {
     ...process.env,
-    PATH: `${MOCK_BIN_DIR}:${process.env.PATH}`,
-    GEMINI_API_KEY: "chiave_di_test"
+    PATH: `${MOCK_BIN_DIR}:${process.env.PATH}`
   };
+  delete env.GEMINI_API_KEY;
+
+  // Impostiamo prima un modello valido per far passare il controllo del modello
+  spawnSync(process.execPath, [COMPANION_PATH, "model", "gemini-1.5-pro"], {
+    env,
+    encoding: "utf8"
+  });
 
   const res = spawnSync(process.execPath, [COMPANION_PATH, "setup", "--json"], {
     env,
@@ -72,16 +91,17 @@ test("agy-companion setup - output JSON corretto", () => {
   assert.equal(res.status, 0, `Il setup dovrebbe terminare con exit code 0. Error: ${res.stderr}`);
   const report = JSON.parse(res.stdout);
   
-  assert.equal(report.ready, true, "Il setup dovrebbe risultare ready con API key e CLI funzionante");
+  assert.equal(report.ready, true, "Il setup dovrebbe risultare ready con CLI funzionante");
   assert.equal(report.agy.available, true, "La CLI agy dovrebbe risultare disponibile");
   assert.match(report.agy.detail, /1\.2\.3/, "Dovrebbe rilevare la versione corretta");
   assert.equal(report.quota.status, "ok", "La quota dovrebbe essere in stato ok");
 });
 
-test("agy-companion setup - segnalazione mancanza API key", () => {
+test("agy-companion setup - errore di login", () => {
   const env = {
     ...process.env,
-    PATH: `${MOCK_BIN_DIR}:${process.env.PATH}`
+    PATH: `${MOCK_BIN_DIR}:${process.env.PATH}`,
+    MOCK_AGY_QUOTA_ERROR: "login_failure"
   };
   delete env.GEMINI_API_KEY;
 
@@ -92,8 +112,31 @@ test("agy-companion setup - segnalazione mancanza API key", () => {
 
   assert.equal(res.status, 0);
   const report = JSON.parse(res.stdout);
-  assert.equal(report.ready, false, "Non dovrebbe essere ready senza la chiave API");
+  assert.equal(report.ready, false, "Non dovrebbe essere ready in caso di login fallito");
   assert.equal(report.auth.loggedIn, false);
+  assert.equal(report.auth.requiresAuth, true);
+  assert.match(report.auth.detail, /login/);
+});
+
+test("agy-companion setup - errore limiti raggiunti", () => {
+  const env = {
+    ...process.env,
+    PATH: `${MOCK_BIN_DIR}:${process.env.PATH}`,
+    MOCK_AGY_QUOTA_ERROR: "limits_reached"
+  };
+  delete env.GEMINI_API_KEY;
+
+  const res = spawnSync(process.execPath, [COMPANION_PATH, "setup", "--json"], {
+    env,
+    encoding: "utf8"
+  });
+
+  assert.equal(res.status, 0);
+  const report = JSON.parse(res.stdout);
+  assert.equal(report.ready, false, "Non dovrebbe essere ready in caso di quota superata");
+  assert.equal(report.auth.loggedIn, true, "L'utente dovrebbe risultare loggato anche se la quota è esaurita");
+  assert.equal(report.auth.requiresAuth, false);
+  assert.match(report.auth.detail, /quota/);
 });
 
 test("agy-companion review - esecuzione in foreground", () => {
@@ -201,4 +244,40 @@ test("agy-companion - tracciamento dei job e status/result/cancel", async () => 
   assert.equal(resResult.status, 0);
   const resultReport = JSON.parse(resResult.stdout);
   assert.equal(resultReport.job.id, jobId);
+});
+
+test("agy-companion model - impostazione modello valida", () => {
+  const env = {
+    ...process.env,
+    PATH: `${MOCK_BIN_DIR}:${process.env.PATH}`
+  };
+  delete env.GEMINI_API_KEY;
+
+  const res = spawnSync(process.execPath, [COMPANION_PATH, "model", "gemini-1.5-pro", "--json"], {
+    env,
+    encoding: "utf8"
+  });
+
+  assert.equal(res.status, 0);
+  const result = JSON.parse(res.stdout);
+  assert.equal(result.success, true);
+  assert.equal(result.model, "gemini-1.5-pro");
+});
+
+test("agy-companion model - impostazione modello non supportata", () => {
+  const env = {
+    ...process.env,
+    PATH: `${MOCK_BIN_DIR}:${process.env.PATH}`
+  };
+  delete env.GEMINI_API_KEY;
+
+  const res = spawnSync(process.execPath, [COMPANION_PATH, "model", "modello-non-valido", "--json"], {
+    env,
+    encoding: "utf8"
+  });
+
+  assert.equal(res.status, 1);
+  const result = JSON.parse(res.stdout);
+  assert.equal(result.success, false);
+  assert.match(result.error, /non supportato/);
 });

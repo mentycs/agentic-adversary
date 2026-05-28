@@ -38,6 +38,14 @@ import {
   SESSION_ID_ENV
 } from "./lib/tracked-jobs.mjs";
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
+import { SetupUseCase } from "../../../src/core/setup-use-case.mjs";
+import { ModelUseCase } from "../../../src/core/model-use-case.mjs";
+import {
+  NodeShellAdapter,
+  NodeFileSystemAdapter,
+  NodeStateAdapter,
+  NodeInteractionAdapter
+} from "./lib/adapters.mjs";
 import {
   renderReviewResult,
   renderStoredJobResult,
@@ -57,6 +65,7 @@ function printUsage() {
     [
       "Uso:",
       "  node scripts/agy-companion.mjs setup [--enable-review-gate|--disable-review-gate] [--json]",
+      "  node scripts/agy-companion.mjs model [modello] [--json]",
       "  node scripts/agy-companion.mjs review [--wait|--background]",
       "  node scripts/agy-companion.mjs adversarial-review [--wait|--background] [focus text]",
       "  node scripts/agy-companion.mjs task [--background] [--resume-last|--resume|--fresh] [prompt]",
@@ -145,35 +154,73 @@ async function buildSetupReportLocal(cwd, actionsTaken = []) {
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   const nodeStatus = binaryAvailable("node", ["--version"], { cwd });
   const npmStatus = binaryAvailable("npm", ["--version"], { cwd });
-  const agyStatus = getAgyAvailability(cwd);
-  const quota = await getAgyQuota(cwd);
+  
+  const shellAdapter = new NodeShellAdapter(cwd);
+  const fsAdapter = new NodeFileSystemAdapter(cwd);
+  const stateAdapter = new NodeStateAdapter(workspaceRoot);
+  
+  const setupUseCase = new SetupUseCase(shellAdapter, fsAdapter, stateAdapter);
+  const useCaseResult = await setupUseCase.execute();
   const config = getConfig(workspaceRoot);
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  let loggedIn = false;
+  let detail = "Non autenticato";
+  let requiresAuth = true;
+
+  const quotaCheck = useCaseResult.checks.quota;
+  if (quotaCheck.status === "ok") {
+    loggedIn = true;
+    detail = "Autenticazione valida (quota OK)";
+    requiresAuth = false;
+  } else if (quotaCheck.errorType === "limits_reached") {
+    loggedIn = true;
+    detail = "Autenticazione valida, ma la quota/limiti di richieste sono stati raggiunti.";
+    requiresAuth = false;
+  } else if (quotaCheck.errorType === "login_failure") {
+    loggedIn = false;
+    detail = "Errore di autenticazione: login non effettuato o sessione scaduta.";
+    requiresAuth = true;
+  } else {
+    loggedIn = false;
+    detail = quotaCheck.message || "Stato di autenticazione sconosciuto.";
+    requiresAuth = true;
+  }
+
   const authStatus = {
-    loggedIn: !!apiKey,
-    detail: apiKey ? "Chiave API di Gemini configurata correttamente" : "Chiave API di Gemini non trovata nell'ambiente",
-    requiresAuth: !apiKey
+    loggedIn,
+    detail,
+    requiresAuth
   };
 
   const nextSteps = [];
-  if (!agyStatus.available) {
+  if (useCaseResult.checks.agyCli.status !== "ok") {
     nextSteps.push("Installa la CLI agy con `npm install -g @google/antigravity`.");
   }
-  if (!apiKey) {
-    nextSteps.push("Imposta la variabile d'ambiente GEMINI_API_KEY per l'autenticazione.");
+  if (requiresAuth) {
+    nextSteps.push("Effettua l'autenticazione tramite la CLI `agy`.");
+  }
+  if (useCaseResult.checks.modelValidation.status !== "ok") {
+    nextSteps.push("Seleziona un modello con il comando `/agy:model`.");
   }
   if (!config.stopReviewGate) {
     nextSteps.push("Opzionale: esegui `/agy:setup --enable-review-gate` per abilitare la code review prima della chiusura.");
   }
 
   return {
-    ready: nodeStatus.available && agyStatus.available && !!apiKey && quota.status !== "error",
+    ready: useCaseResult.isReady,
     node: nodeStatus,
     npm: npmStatus,
-    agy: agyStatus,
+    agy: {
+      available: useCaseResult.checks.agyCli.status === "ok",
+      detail: useCaseResult.checks.agyCli.message
+    },
     auth: authStatus,
-    quota: quota,
+    quota: {
+      status: quotaCheck.status,
+      message: quotaCheck.message,
+      ...(quotaCheck.errorType ? { errorType: quotaCheck.errorType } : {})
+    },
+    modelValidation: useCaseResult.checks.modelValidation,
     sessionRuntime: getSessionRuntimeStatus(process.env, workspaceRoot),
     reviewGateEnabled: Boolean(config.stopReviewGate),
     actionsTaken,
@@ -712,6 +759,49 @@ async function handleCancel(argv) {
   outputCommandResult(payload, renderCancelReport(nextJob), options.json);
 }
 
+async function handleModel(argv) {
+  const { options, positionals } = parseCommandInput(argv, {
+    valueOptions: ["cwd"],
+    booleanOptions: ["json"]
+  });
+
+  const cwd = resolveCommandCwd(options);
+  const workspaceRoot = resolveCommandWorkspace(options);
+  const targetModel = positionals[0] ?? null;
+
+  const shellAdapter = new NodeShellAdapter(cwd);
+  const stateAdapter = new NodeStateAdapter(workspaceRoot);
+  const interactionAdapter = new NodeInteractionAdapter();
+
+  const modelUseCase = new ModelUseCase(shellAdapter, stateAdapter, interactionAdapter);
+  
+  try {
+    const result = await modelUseCase.execute(targetModel);
+    const output = {
+      success: true,
+      model: result.model,
+      message: `Modello impostato correttamente a: ${result.model}`
+    };
+    
+    if (options.json) {
+      console.log(JSON.stringify(output, null, 2));
+    } else {
+      console.log(`\nSuccesso: Modello impostato correttamente a: ${result.model}`);
+    }
+  } catch (error) {
+    const output = {
+      success: false,
+      error: error.message
+    };
+    if (options.json) {
+      console.log(JSON.stringify(output, null, 2));
+    } else {
+      console.error(`\nErrore: ${error.message}`);
+    }
+    process.exitCode = 1;
+  }
+}
+
 async function main() {
   const [subcommand, ...argv] = process.argv.slice(2);
   if (!subcommand || subcommand === "help" || subcommand === "--help") {
@@ -722,6 +812,9 @@ async function main() {
   switch (subcommand) {
     case "setup":
       await handleSetup(argv);
+      break;
+    case "model":
+      await handleModel(argv);
       break;
     case "review":
       await handleReviewCommand(argv, false);

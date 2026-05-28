@@ -247,7 +247,7 @@ test("SetupUseCase - Gestione errore della quota per limiti raggiunti (quota sup
 });
 
 // Nuovi test per la validazione del modello
-test("SetupUseCase - Fallimento quando non è stato selezionato alcun modello", async () => {
+test("SetupUseCase - Configurazione automatica del modello di default se non precedentemente selezionato", async () => {
   const shellMock = new MockShellPort(async (command, args) => {
     if (command === "agy" && args.includes("--version")) {
       return { exitCode: 0, stdout: "agy versione 1.0.0\n", stderr: "" };
@@ -256,7 +256,7 @@ test("SetupUseCase - Fallimento quando non è stato selezionato alcun modello", 
       return { exitCode: 0, stdout: '{"total": 100, "remaining": 90}\n', stderr: "" };
     }
     if (command === "agy" && args.includes("model")) {
-      return { exitCode: 0, stdout: "gemini-1.5-pro\ngemini-1.5-flash\n", stderr: "" };
+      return { exitCode: 0, stdout: "gemini-3.5-flash\ngemini-1.5-pro\ngemini-1.5-flash\n", stderr: "" };
     }
     return { exitCode: 1, stdout: "", stderr: "Comando non mockato" };
   });
@@ -268,9 +268,9 @@ test("SetupUseCase - Fallimento quando non è stato selezionato alcun modello", 
   const useCase = new SetupUseCase(shellMock, fsMock, stateMock);
   const result = await useCase.execute();
 
-  assert.equal(result.isReady, false, "Il setup non dovrebbe essere pronto senza modello");
-  assert.equal(result.checks.modelValidation.status, "error");
-  assert.match(result.checks.modelValidation.message, /Nessun modello precedentemente selezionato/i);
+  assert.equal(result.isReady, true, "Il setup dovrebbe risultare pronto autoconfigurando il modello di default");
+  assert.equal(result.checks.modelValidation.status, "ok");
+  assert.equal(stateMock.config.selectedModel, "gemini-3.5-flash");
 });
 
 test("SetupUseCase - Fallimento quando il modello selezionato non è disponibile in agy", async () => {
