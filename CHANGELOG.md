@@ -6,6 +6,9 @@
 
 ## Releases
 
+### [0.4.2] — 2026-05-28
+- Corretti gli URL fittizi e i percorsi del repository GitHub all'interno di `README.md` sostituendoli con quelli effettivi (`mentycs/agentic-adversary`).
+
 ### [0.4.1] — 2026-05-28
 - Aggiunto lo script di bootstrap autocontenuto `install.mjs` per consentire l'installazione remota diretta del plugin da GitHub.
 - Implementato il download automatico con gestione errori (flag `-f` su curl) e l'estrazione dello zipball nella cartella utente permanente `~/.antigravitycli/installed/`.
@@ -81,6 +84,11 @@
 - Inizializzazione della struttura del repository e avvio dell'analisi comparativa tra OpenAI Codex Plugin CC e Antigravity SDK (`agy`).
 
 ## Action log
+
+- **2026-05-28 11:55**: Corretti gli URL e i percorsi del repository GitHub all'interno di `README.md` impostando l'indirizzo corretto `mentycs/agentic-adversary` in sostituzione dei riferimenti locali fittizi.
+  - **Rationale**: Consentire agli utenti di scaricare correttamente lo script di installazione diretta da GitHub da qualsiasi computer senza incorrere in errori 404 dovuti ad indirizzi errati.
+  - **User request**: da un'altro pc ottengo curl: (56) The requested URL returned error: 404
+  - **Rollback**: Ripristinare `README.md`, `VERSION` e `package.json` a `0.4.1`.
 
 - **2026-05-28 11:50**: Aggiunto lo script autocontenuto `install.mjs` ed aggiornato `README.md` per consentire l'installazione remota diretta del plugin da GitHub senza clonazione manuale.
   - **Rationale**: Consentire agli utenti di installare ed abilitare il plugin inserendo direttamente le credenziali di GitHub da terminale, evitando la necessità di scaricare o clonare manualmente il repository locale prima dell'uso.
