@@ -20,7 +20,8 @@ function defaultState() {
   return {
     version: STATE_VERSION,
     config: {
-      stopReviewGate: false
+      stopReviewGate: false,
+      selectedModel: "gemini-3.5-flash"
     },
     jobs: []
   };

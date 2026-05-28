@@ -6,6 +6,11 @@
 
 ## Releases
 
+### [0.3.4] — 2026-05-28
+- Spostata la configurazione del modello di default direttamente all'interno delle impostazioni predefinite dello stato (`defaultState()` in `state.mjs`).
+- Reso `gemini-3.5-flash` il modello di default forzatamente pre-impostato per tutte le nuove sessioni, a meno che non venga modificato manualmente con `/agy:model`.
+- Mantenuti tutti i controlli di integrità ed esagonali di `SetupUseCase` e `ModelUseCase` allineati alla nuova configurazione predefinita.
+
 ### [0.3.3] — 2026-05-28
 - Rimossa del tutto l'obbligatorietà e la segnalazione d'errore relativa a `GEMINI_API_KEY`, delegando l'autenticazione all'esito effettivo della CLI `agy` (OAuth).
 - Implementati gli adapter reali Node.js per le porte esagonali (`NodeShellAdapter`, `NodeFileSystemAdapter`, `NodeStateAdapter`, `NodeInteractionAdapter`) in `plugins/agy/scripts/lib/adapters.mjs`.
@@ -62,6 +67,11 @@
 - Inizializzazione della struttura del repository e avvio dell'analisi comparativa tra OpenAI Codex Plugin CC e Antigravity SDK (`agy`).
 
 ## Action log
+
+- **2026-05-28 10:55**: Spostato il modello predefinito globale all'interno di `defaultState()` di `state.mjs`. In questo modo `gemini-3.5-flash` viene configurato automaticamente all'avvio come modello predefinito, a meno che non venga modificato manualmente.
+  - **Rationale**: Assicurare che tutti i comandi legati ad agy utilizzino fin da subito gemini-3.5-flash senza forzature a runtime durante il setup.
+  - **User request**: mdifica l'impostazione di default forzata in /agy:model gemini-3.5-flash , a meno che non sia stata modificata manualmente con /agy:setup.
+  - **Rollback**: Ripristinare `plugins/agy/scripts/lib/state.mjs` e `VERSION` allo stato precedente all'azione (rilascio `0.3.3`).
 
 - **2026-05-28 10:35**: Decoppiata definitivamente la chiave API `GEMINI_API_KEY` da setup e test. Implementati gli adapter reali delle porte esagonali e cablati `SetupUseCase` e `ModelUseCase` nel companion script, completando il comando `/agy:model`.
   - **Rationale**: Permettere un setup robusto basato solo su OAuth CLI e autoconfigurare `gemini-3.5-flash` in modo resiliente rispetto ai limiti di interrogazione di agy.
