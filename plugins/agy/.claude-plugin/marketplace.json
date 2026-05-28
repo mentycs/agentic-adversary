@@ -1,0 +1,25 @@
+{
+  "name": "agy-marketplace",
+  "owner": {
+    "name": "Mentycs",
+    "email": "contact@mentycs.com"
+  },
+  "metadata": {
+    "description": "Antigravity CLI Companion Marketplace",
+    "version": "0.4.2"
+  },
+  "plugins": [
+    {
+      "name": "agy",
+      "version": "1.0.4",
+      "description": "Use Antigravity from Claude Code to review code or delegate tasks.",
+      "source": {
+        "path": "."
+      },
+      "author": {
+        "name": "Google"
+      },
+      "license": "Apache-2.0"
+    }
+  ]
+}

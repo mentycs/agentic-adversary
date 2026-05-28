@@ -6,6 +6,9 @@
 
 ## Releases
 
+### [0.4.3] — 2026-05-28
+- Creato il file `marketplace.json` all'interno della cartella `.claude-plugin/` del plugin `agy` per consentire a Claude Code di caricarlo correttamente come parte di un marketplace locale o remoto.
+
 ### [0.4.2] — 2026-05-28
 - Corretti gli URL fittizi e i percorsi del repository GitHub all'interno di `README.md` sostituendoli con quelli effettivi (`mentycs/agentic-adversary`).
 
@@ -84,6 +87,11 @@
 - Inizializzazione della struttura del repository e avvio dell'analisi comparativa tra OpenAI Codex Plugin CC e Antigravity SDK (`agy`).
 
 ## Action log
+
+- **2026-05-28 12:05**: Creato il file `marketplace.json` in `plugins/agy/.claude-plugin/marketplace.json`.
+  - **Rationale**: Consentire a Claude Code di riconoscere e validare la cartella del plugin locale come sorgente di un marketplace, evitando l'errore bloccante "Marketplace file not found" durante il caricamento.
+  - **User request**: non funziona (segnala mancanza di marketplace.json)
+  - **Rollback**: Rimuovere `plugins/agy/.claude-plugin/marketplace.json`, ripristinare `VERSION` e `package.json` a `0.4.2`.
 
 - **2026-05-28 11:55**: Corretti gli URL e i percorsi del repository GitHub all'interno di `README.md` impostando l'indirizzo corretto `mentycs/agentic-adversary` in sostituzione dei riferimenti locali fittizi.
   - **Rationale**: Consentire agli utenti di scaricare correttamente lo script di installazione diretta da GitHub da qualsiasi computer senza incorrere in errori 404 dovuti ad indirizzi errati.
